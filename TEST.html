@@ -1,0 +1,86 @@
+<?php
+// получаем файлы по определенному голосованию
+$id =  (int) $_GET[id];
+$vote = (int) $_GET[vote];
+
+if (file_exists("$id.dat")) {
+
+$ip= $_SERVER['REMOTE_ADDR'];
+$ip_file = file_get_contents("ip$id.dat");
+$ip_abbr = explode(",", $ip_file);
+$data = file("$id.dat");
+
+// если это не просто просмотр результатов
+if ($vote) {
+
+foreach($ip_abbr as $value)
+if ($ip == $value) {echo "<p><b><font color=red> Вы уже голосовали! </font></b></p>";
+exit;
+}
+// выводим благодарность
+echo "<p><b><font color=green> Спасибо! </font></b><br /><i>*Показаны результаты до Вашего голосования:</i><p>";
+}
+// выводим заголовок голосования - 1я строка файла
+for ($i=1;$i<count($data);$i++) {
+  $votes = explode("~", $data[$i]); // значение~ответ
+  $graf = 100*$votes[0]/(count($ip_abbr)-1);
+  $gist_all[] = round($graf, 3);
+  $names[] = trim($votes[1]);
+  $res_vote[] = $votes[0];
+}
+// если это не просмотр результатов, а голосование,
+// производим необходимые действия для учета голоса
+if ($vote) {
+  $f = fopen("$id.dat","w");
+  flock($f,LOCK_EX);
+  fputs($f, "$data[0]");
+  for ($i=1;$i<count($data);$i++) {
+    $votes = explode("~", $data[$i]);
+    if ($i==$vote) $votes[0]++;
+    fputs($f,"$votes[0]~$votes[1]");
+	fflush($f);
+flock($f,LOCK_UN);
+  }
+  fclose($f);
+  
+  $ip_adr = fopen("ip$id.dat","a++");
+	flock($ip_adr,LOCK_EX);
+ fputs($ip_adr, "$ip".",");
+ fflush($ip_adr);
+	flock($ip_adr,LOCK_UN);
+fclose($ip_adr);
+  }
+
+	} else {
+     echo "Такого голосования не существует.";
+	exit;
+}
+?>
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load("current", {packages:["corechart"]});
+      google.charts.setOnLoadCallback(drawChart);
+      function drawChart() {
+ var data = google.visualization.arrayToDataTable([
+          ['Название', 'Цифры'],
+ <?php 
+ for ($i=0;$i<count($names);$i++) { echo '["'.$names[$i].'\n'.$res_vote[$i].' = '.$gist_all[$i].'%", '.$gist_all[$i].'],';
+ }
+ ?> ]);        
+        var options = {
+          title: 'Всего: ' + <?=(count($ip_abbr)-1);?>,
+          is3D: true,
+ chartArea:{left:10,top:20,width:'80%',height:'70%'},
+ width: 400 };
+        var chart = new google.visualization.PieChart(document.getElementById('piechart_3d'));
+        chart.draw(data, options);
+      }
+    </script>
+  </head>
+  <body>
+    <div style="width: 350px; text-align: center"><?=$data[0]; ?></div>
+    <div id="piechart_3d" style="width: 350px; height: 250px; margin-top:-8px;margin-left:-9px"></div>
+  </body>
+</html>
